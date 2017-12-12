@@ -1,7 +1,22 @@
 //引入集合操作方法
 var User = require('../model/User');
+var Post = require('../model/Post');
 //引入一个加密插件
 var crypto = require('crypto');
+//引入上传的文件
+var multer= require('multer');
+var storage = multer.diskStorage({
+    destination:function (req,file,cd) {
+        cd(null,'./public/images')
+    },
+    filename:function (req,file,cd) {
+        cd(null,file.originalname);
+    }
+})
+var upload = multer({storage:storage})
+
+
+
 //未登录的时候
 function checkLogin(req,res,next) {
     if(!req.session.user){
@@ -22,11 +37,20 @@ function checkNotLogin(req,res,next) {
 }
 module.exports = function (app) {
     app.get('/',function (req,res) {
-        res.render('index',{
-            title:'首页',
-            user:req.session.user,
-            success:req.flash('success').toString(),
-            error:req.flash('error').toString()
+
+        Post.get(null,function (err,docs) {
+            if(err){
+                req.flash('error',err);
+                return res.redirect('/')
+            }
+            res.render('index',{
+                title:'首页',
+                user:req.session.user,
+                success:req.flash('success').toString(),
+                error:req.flash('error').toString(),
+                docs:docs
+            })
+
         })
 
     })
@@ -137,6 +161,16 @@ module.exports = function (app) {
     })
     // 发表行为
     app.post('/post',function (req,res) {
+        var currentName = req.session.user.username;
+        var newPost = new Post(currentName,req.body.title,req.body.content);
+        newPost.save(function (err) {
+            if(err){
+                req.flash('error',err);
+                return res.redirect('/');
+            }
+            req.flash('success','发表行为');
+            return res.redirect('/');
+        })
 
     })
     // 退出
@@ -146,7 +180,18 @@ module.exports = function (app) {
         req.flash('success','成功退出');
         return res.redirect('/');
     })
-
+    app.get('/upload',checkLogin,function (req,res) {
+        res.render('upload',{
+            title:'上传',
+            user:req.session.user,
+            success:req.flash('success').toString(),
+            error:req.flash('error').toString()
+        })
+    })
+    app.post('/upload',upload.array('filename',5),function (req,res) {
+        req.flash('success','上传成功');
+        return res.redirect('/upload');
+    })
 
 
 
